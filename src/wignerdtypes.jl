@@ -13,11 +13,12 @@ end
 
 abstract type AbstractWignerMatrix{T} <: AbstractMatrix{T} end
 
-struct WignerdMatrix{T<:Real,V<:AbstractArray{<:Real}} <: AbstractWignerMatrix{T}
+mutable struct WignerdMatrix{T<:Real,B<:Real,V<:AbstractArray{<:Real}} <: AbstractWignerMatrix{T}
 	j :: HalfInt
+	β :: B
 	dj :: V
 
-	function WignerdMatrix{T,V}(j::HalfInt, dj::V) where {T,V<:AbstractArray{<:Real}}
+	function WignerdMatrix{T,B,V}(j::HalfInt, β::B, dj::V) where {T,B<:Real,V<:AbstractArray{<:Real}}
 		
 		j >= 0 || throw(ArgumentError("j must be ≥ 0"))
 
@@ -28,24 +29,35 @@ struct WignerdMatrix{T<:Real,V<:AbstractArray{<:Real}} <: AbstractWignerMatrix{T
 			"has length = $(length(dj))"))
 		end
 
-		new{T,V}(j, dj)
+		new{T,B,V}(j, β, dj)
 	end
 end
 
-function WignerdMatrix(T::Type, j, dj::V) where {V<:AbstractArray{<:Real}}
-	WignerdMatrix{T,V}(HalfInt(j), dj)
+function WignerdMatrix(T::Type, j, β::B, dj::V) where {B<:Real,V<:AbstractArray{<:Real}}
+	WignerdMatrix{T,B,V}(HalfInt(j), β, dj)
 end
 
-function WignerdMatrix(j, dj::AbstractArray{R}) where {R<:Real}
+function WignerdMatrix(j, β, dj::AbstractArray{R}) where {R<:Real}
 	T = promote_type_phase(R)
-	WignerdMatrix(T, HalfInt(j), dj)
+	WignerdMatrix(T, HalfInt(j), β, dj)
 end
 
-mutable struct WignerDMatrix{T<:Complex,A<:Real,W<:WignerdMatrix,G<:Real} <: AbstractWignerMatrix{T}
+function WignerdMatrix{Q}(::UndefInitializer, j, β) where {Q<:Real}
+	dj = Vector{Q}(undef, filledelements(j))
+	WignerdMatrix(Q, j, β, dj)
+end
+
+struct WignerDMatrix{T<:Complex,A<:Real,W<:WignerdMatrix,G<:Real} <: AbstractWignerMatrix{T}
 	α :: A
 	dj :: W
 	γ :: G
 end
+
+eulerangles(d::WignerdMatrix) = (zero(d.β), d.β, zero(d.β))
+eulerangles(D::WignerDMatrix) = (D.α, D.dj.β, D.γ)
+
+updatebeta!(d::WignerdMatrix,β) = (d.β = β)
+updatebeta!(D::WignerDMatrix,β) = updatebeta!(D.dj, β)
 
 function WignerDMatrix(T::Type, α::A, dj::W, γ::G) where {W<:WignerdMatrix,A<:Real,G<:Real}
 	WignerDMatrix{T,A,W,G}(α, dj, γ)
@@ -58,7 +70,7 @@ function WignerDMatrix(α::A, dj::WignerdMatrix{R}, γ::G) where {R<:Real,A<:Rea
 end
 
 function Base.:(==)(d1::WignerdMatrix, d2::WignerdMatrix)
-	d1.j == d2.j && d1.dj == d2.dj
+	d1.j == d2.j && d1.β == d2.β && d1.dj == d2.dj
 end
 function Base.:(==)(d1::WignerDMatrix, d2::WignerDMatrix)
 	d1.α == d2.α && d1.γ == d2.γ && d1.dj == d2.dj
@@ -121,6 +133,22 @@ end
 	val = d.dj[m,n]*cis(-(m*d.α + n*d.γ))
 	convert(T, val)
 end
+@inline @Base.propagate_inbounds function Base.getindex(d::WignerDMatrix{T,<:SpecialAngles}, m::HalfInteger, n::HalfInteger) where {T}
+	val = d.dj[m,n]*cis_special(-m,d.α)*cis(-n*d.γ)
+	convert(T, val)
+end
+@inline @Base.propagate_inbounds function Base.getindex(d::WignerDMatrix{T,<:Real,<:WignerdMatrix,G}, 
+	m::HalfInteger, n::HalfInteger) where {T,G<:SpecialAngles}
+
+	val = d.dj[m,n]*cis(-m*d.α)*cis_special(-n,d.γ)
+	convert(T, val)
+end
+@inline @Base.propagate_inbounds function Base.getindex(d::WignerDMatrix{T,A,<:WignerdMatrix,G}, 
+	m::HalfInteger, n::HalfInteger) where {T,A<:SpecialAngles,G<:SpecialAngles}
+
+	val = d.dj[m,n]*cis_special(-m,d.α)*cis_special(-n,d.γ)
+	convert(T, val)
+end
 
 @inline Base.@propagate_inbounds function Base.getindex(d::WignerdMatrix{T}, m::HalfInteger, n::HalfInteger) where {T}
 	@boundscheck abs(m) <= d.j || throw(ArgumentError("j ⩽ m ⩽ j not satisfied for j = $(d.j) and m = $m"))
@@ -160,11 +188,6 @@ end
 	d.dj[ind] = val
 end
 
-function WignerdMatrix{Q}(::UndefInitializer, j) where {Q}
-	dj = Vector{Q}(undef, filledelements(j))
-	WignerdMatrix(j, dj)
-end
-
 sphericaldegree(d::WignerdMatrix) = d.j
 sphericaldegree(d::WignerDMatrix) = sphericaldegree(d.dj)
 
@@ -193,19 +216,21 @@ function Base.collect(d::AbstractWignerMatrix{T}) where {T}
 	dfull
 end
 
-Base.similar(d::WignerdMatrix{T}) where {T} = WignerdMatrix(T, d.j, similar(d.dj))
-Base.similar(d::WignerdMatrix, ::Type{T}) where {T} = WignerdMatrix(T, d.j, similar(d.dj))
+Base.similar(d::WignerdMatrix{T}) where {T} = WignerdMatrix(T, d.j, d.β, similar(d.dj))
+Base.similar(d::WignerdMatrix, ::Type{T}) where {T} = WignerdMatrix(T, d.j, d.β, similar(d.dj))
 Base.similar(D::WignerDMatrix{T}) where {T} = WignerDMatrix(T, D.α, similar(D.dj), D.γ)
 Base.similar(D::WignerDMatrix, ::Type{T}) where {T} = WignerDMatrix(T, D.α, similar(D.dj), D.γ)
 
 # Display
 
-function Base.summary(io::IO,d::WignerdMatrix)
-	print(io,"Wigner d-matrix with j = ",d.j)
+function Base.summary(io::IO, d::WignerdMatrix)
+	print(io,"Wigner d-matrix with j = ",d.j," and β = ",d.β)
 end
-function Base.summary(io::IO,d::WignerDMatrix)
-	print(io,"Wigner D-matrix with j = ",d.dj.j,
-		", with α = ",d.α," and γ = ",d.γ)
+function Base.summary(io::IO, D::WignerDMatrix)
+	α, β, γ = eulerangles(D)
+	j = sphericaldegree(D)
+	print(io,"Wigner D-matrix with j = ",j,
+		", with α = ",α,", β = ",β," and γ = ",γ)
 end
 function Base.show(io::IO, d::AbstractWignerMatrix)
 	summary(io, d)

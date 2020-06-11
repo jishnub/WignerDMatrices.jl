@@ -1,11 +1,11 @@
-abstract type SpecialBetas <: Real end
-struct BetaPiby2 <: SpecialBetas end
-abstract type ScaledPi <: SpecialBetas end
-struct BetaZero <: ScaledPi end
-struct BetaPi <: ScaledPi end
+abstract type SpecialAngles <: Real end
+struct Piby2Radians <: SpecialAngles end
+abstract type ScaledPi <: SpecialAngles end
+struct ZeroRadians <: ScaledPi end
+struct PiRadians <: ScaledPi end
 
 # Returns exp(i α π/2) = cos(α π/2) + i*sin(α π/2)
-function cis_special(α::HalfInt,::BetaPiby2)
+function cis_special(α::HalfInt,::Piby2Radians)
 	if isinteger(α)
 		res = zero(ComplexF64)
 		αmod4 = mod(Integer(α),4)
@@ -19,17 +19,17 @@ function cis_special(α::HalfInt,::BetaPiby2)
 			res -= one(res)*im
 		end
 	else
-		res = cis(α*float(BetaPiby2()))
+		res = cis(α*float(Piby2Radians()))
 	end
 	return res
 end
 
-cis_special(α::HalfInt,::BetaZero) = one(ComplexF64)
+cis_special(α::HalfInt,::ZeroRadians) = one(ComplexF64)
 
 # Returns exp(i α π) = cos(α π) + i*sin(α π)
 # If α is an integer then this is equal to cos(απ) = (-1)^α
 # If α is a half-integer, then this is equal to im*sin(απ) = im*(-1)^(2α)
-function cis_special(α::HalfInt,::BetaPi)
+function cis_special(α::HalfInt,::PiRadians)
 	if isinteger(α)
 		res = one(ComplexF64)
 		if isodd(Integer(α))
@@ -45,21 +45,21 @@ function cis_special(α::HalfInt,::BetaPi)
 	return res
 end
 
-cis_special(α, p::SpecialBetas) = cis_special(HalfInt(α),p)
+cis_special(α, p::SpecialAngles) = cis_special(HalfInt(α),p)
 
-Base.cos(::BetaZero) = one(Float64)
-Base.cos(::BetaPi) = -one(Float64)
-Base.cos(::BetaPiby2) = zero(Float64)
-Base.sin(::BetaPiby2) = one(Float64)
+Base.cos(::ZeroRadians) = one(Float64)
+Base.cos(::PiRadians) = -one(Float64)
+Base.cos(::Piby2Radians) = zero(Float64)
+Base.sin(::Piby2Radians) = one(Float64)
 Base.sin(::ScaledPi) = zero(Float64)
 
-Base.Float64(::BetaPiby2) = π/2
-Base.Float64(::BetaZero) = zero(Float64)
-Base.Float64(::BetaPi) = Float64(π)
-Base.AbstractFloat(p::SpecialBetas) = Float64(p)
+Base.Float64(::Piby2Radians) = π/2
+Base.Float64(::ZeroRadians) = zero(Float64)
+Base.Float64(::PiRadians) = Float64(π)
+Base.AbstractFloat(p::SpecialAngles) = Float64(p)
 
-Base.one(::SpecialBetas) = one(Float64)
-Base.zero(::SpecialBetas) = zero(Float64)
+Base.one(::SpecialAngles) = one(Float64)
+Base.zero(::SpecialAngles) = zero(Float64)
 
-Base.promote_rule(::Type{<:SpecialBetas},::Type{Float64}) = Float64
-Base.promote_rule(::Type{<:SpecialBetas},T::Type{<:Real}) = promote_type(Float64,T)
+Base.promote_rule(::Type{<:SpecialAngles},::Type{Float64}) = Float64
+Base.promote_rule(::Type{<:SpecialAngles},T::Type{<:Real}) = promote_type(Float64,T)

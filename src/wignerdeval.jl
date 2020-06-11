@@ -35,22 +35,21 @@ function djmatrix_terms(β::Real,λ,v,m,n,j)
 	nind = searchsortedfirst(-j:j, n)
 
 	for μ in axes(λ,1)
-		temp  = v[μ,mind] * conj(v[μ,nind])
-		dj_m_n += cis(-λ[μ]*β) * temp
+		dj_m_n += cis(-λ[μ]*β) * v[μ,mind] * conj(v[μ,nind])
 	end
 
 	dj_m_n
 end
 
-function djmatrix_terms(β::BetaZero,λ,v,m,n,j)
+function djmatrix_terms(β::ZeroRadians,λ,v,m,n,j)
 	(m == n) ? one(ComplexF64) : zero(ComplexF64)
 end
 
-function djmatrix_terms(β::BetaPi,λ,v,m,n,j)
+function djmatrix_terms(β::PiRadians,λ,v,m,n,j)
 	(m == -n) ? ComplexF64((-1)^(j+m)) : zero(ComplexF64)
 end
 
-function djmatrix_terms(β::BetaPiby2,λ,v,m,n,j)
+function djmatrix_terms(β::Piby2Radians,λ,v,m,n,j)
 	dj_m_n = zero(ComplexF64)
 
 	mind = searchsortedfirst(-j:j, m)
@@ -58,8 +57,7 @@ function djmatrix_terms(β::BetaPiby2,λ,v,m,n,j)
 
 	if !(isodd(Integer(j+m)) && n == 0) && !(isodd(Integer(j+n)) && m == 0)
 		for μ in axes(λ,1)
-			temp  = v[μ,mind] * conj(v[μ,nind])
-			dj_m_n += cis_special(-λ[μ],β) * temp
+			dj_m_n += cis_special(-λ[μ],β) * v[μ,mind] * conj(v[μ,nind])
 		end
 	end
 
@@ -75,17 +73,18 @@ function djmatrix_fill!(d::WignerdMatrix,j,β,λ,v)
 end
 djmatrix_fill!(d::WignerDMatrix,args...) = djmatrix_fill!(d.dj,args...)
 
-function WignerdMatrix!(d, β::Real,
+function WignerdMatrix!(d::AbstractWignerMatrix, β::Real,
 	A = Matrix{ComplexF64}(undef,twojp1(d),twojp1(d)))
 
 	j = sphericaldegree(d)
 	v = Jy_eigen!(j, A)
 	λ = -j:j
+	updatebeta!(d,β)
 	djmatrix_fill!(d,j,β,λ,v)
 end
 
 function WignerdMatrix(T::Type, j, β::Real)
-	d = WignerdMatrix{T}(undef, j)
+	d = WignerdMatrix{T}(undef, j, β)
 	
 	A = Matrix{ComplexF64}(undef, twojp1(j), twojp1(j))
 	
