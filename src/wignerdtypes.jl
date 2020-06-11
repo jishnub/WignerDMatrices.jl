@@ -53,21 +53,22 @@ struct WignerDMatrix{T<:Complex,A<:Real,W<:WignerdMatrix,G<:Real} <: AbstractWig
 	γ :: G
 end
 
-eulerangles(d::WignerdMatrix) = (zero(d.β), d.β, zero(d.β))
-eulerangles(D::WignerDMatrix) = (D.α, D.dj.β, D.γ)
-
-updatebeta!(d::WignerdMatrix,β) = (d.β = β)
-updatebeta!(D::WignerDMatrix,β) = updatebeta!(D.dj, β)
-
 function WignerDMatrix(T::Type, α::A, dj::W, γ::G) where {W<:WignerdMatrix,A<:Real,G<:Real}
 	WignerDMatrix{T,A,W,G}(α, dj, γ)
 end
+
 function WignerDMatrix(α::A, dj::WignerdMatrix{R}, γ::G) where {R<:Real,A<:Real,G<:Real}
 	TR = promote_type_phase(R)
 	TC = Complex{promote_type(A,G)}
 	T = promote_type(TC,TR)
 	WignerDMatrix{T,A,WignerdMatrix{R},G}(α, dj, γ)
 end
+
+eulerangles(d::WignerdMatrix) = (zero(d.β), d.β, zero(d.β))
+eulerangles(D::WignerDMatrix) = (D.α, D.dj.β, D.γ)
+
+updatebeta!(d::WignerdMatrix,β) = (d.β = β)
+updatebeta!(D::WignerDMatrix,β) = updatebeta!(D.dj, β)
 
 function Base.:(==)(d1::WignerdMatrix, d2::WignerdMatrix)
 	d1.j == d2.j && d1.β == d2.β && d1.dj == d2.dj

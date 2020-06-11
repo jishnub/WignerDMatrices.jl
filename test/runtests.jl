@@ -364,6 +364,7 @@ end
 				@test m*d == m*d
 				@test v'*d == v'*collect(d)
 				@test transpose(v)*d == transpose(v)*collect(d)
+				@test d*d == collect(d)*collect(d)
 			end
 		end
 		@testset "symmetry" begin
@@ -408,6 +409,14 @@ end
 
 		    d = WignerdMatrix(2,ZeroRadians())
 		    @test tr(d) == Float64(5)
+		end
+		@testset "inv" begin
+			for β = π/3:π/3:4π, j in 1//2:1//2:2
+				d = WignerdMatrix(j,β)
+				dinv = inv(d)
+				@test dinv isa WignerdMatrix
+				@test dinv * d ≈ I
+			end
 		end
 	end
 end
@@ -501,6 +510,9 @@ end
 				@test m*D == m*D
 				@test v'*D == v'*collect(D)
 				@test transpose(v)*D == transpose(v)*collect(D)
+				@test D*D == collect(D)*collect(D)
+				@test D*D.dj == collect(D)*collect(D.dj)
+				@test D.dj*D == collect(D.dj)*collect(D)
 			end
 		end
 		@testset "symmetry" begin
@@ -519,17 +531,19 @@ end
 		@testset "trace" begin
 			β = π/3
 			α,γ = π/6, π/2
-		    D = WignerDMatrix(1/2,α,β,γ)
-		    @test tr(D) ≈ sum(D[m,m] for m=-1//2:1//2)
-
-		    D = WignerDMatrix(1,α,β,γ)
-		    @test tr(D) ≈ sum(D[m,m] for m=-1:1)
-
-		    D = WignerDMatrix(3/2,α,β,γ)
-		    @test tr(D) ≈ sum(D[m,m] for m=-3//2:3//2)
-
-		    D = WignerDMatrix(2,α,β,γ)
-		    @test tr(D) ≈ sum(D[m,m] for m=-2:2)
+			for j in 1//2:1//2:2
+			    D = WignerDMatrix(j,α,β,γ)
+			    @test tr(D) ≈ sum(D[m,m] for m=-j:j)
+			end
+		end
+		@testset "inv" begin
+			α,γ = π/6, π/2
+			for β = π/3:π/3:4π, j in 1//2:1//2:2
+				D = WignerDMatrix(j,α,β,γ)
+				Dinv = inv(D)
+				@test Dinv isa WignerDMatrix
+				@test Dinv * D ≈ I
+			end
 		end
 	end
 end

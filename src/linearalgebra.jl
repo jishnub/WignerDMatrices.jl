@@ -7,6 +7,11 @@ for T in [:Transpose, :Adjoint]
 	@eval Base.:(*)(v::$T{U,<:AbstractVector{U}}, d::AbstractWignerMatrix) where {U} = v * collect(d)
 end
 
+# For the time being return an Array
+# This should ideally return a WignerDMatrix
+# I haven't figured out the angles yet
+Base.:(*)(d1::AbstractWignerMatrix, d2::AbstractWignerMatrix) = collect(d1) * collect(d2)
+
 # Symmetry
 for T in [:issymmetric, :ishermitian]
 	@eval LinearAlgebra.$T(::AbstractWignerMatrix) = false
@@ -30,4 +35,16 @@ end
 function LinearAlgebra.tr(d::WignerdMatrix{<:Real,ZeroRadians})
 	j = sphericaldegree(d)
 	float(twojp1(j))
+end
+
+function LinearAlgebra.inv(D::WignerDMatrix)
+	j = sphericaldegree(D)
+	α, β, γ = eulerangles(D)
+	WignerDMatrix(j, -γ, -β, -α)
+end
+
+function LinearAlgebra.inv(D::WignerdMatrix)
+	j = sphericaldegree(D)
+	_, β, _ = eulerangles(D)
+	WignerdMatrix(j, -β)
 end
