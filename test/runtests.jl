@@ -335,6 +335,59 @@ end
 		j = 2
 		checkdjvalues(test,j,n)
 	end
+	@testset "shift angles" begin
+		@testset "β + 4π*n" begin
+			for j in 0:1//2:2, β in -4π:π/4:4π
+		    	d1 = WignerdMatrix(j, β)
+		    	d2 = WignerdMatrix(j, β + 4π)
+		    	d3 = WignerdMatrix(j, β - 4π)
+		    	@test collect(d1) ≈ collect(d2)
+		    	@test collect(d1) ≈ collect(d3)
+		    end
+		end
+		@testset "β + (2n+1)*2π" begin
+		    for j in 0:1//2:2, β in -4π:π/2:4π
+		    	d1 = WignerdMatrix(j, β)
+		    	d2 = WignerdMatrix(j, β + 2π)
+		    	d3 = WignerdMatrix(j, β - 2π)
+		    	d4 = WignerdMatrix(j, β + 6π)
+		    	d5 = WignerdMatrix(j, β - 6π)
+		    	@test collect(d1) ≈ (-1)^2j .* collect(d2)
+		    	@test collect(d1) ≈ (-1)^2j .* collect(d3)
+		    	@test collect(d1) ≈ (-1)^2j .* collect(d4)
+		    	@test collect(d1) ≈ (-1)^2j .* collect(d5)
+		    end 
+		end
+		@testset "negative β" begin
+		    for j in 0:1//2:2, β in -4π:π/4:4π
+		    	d1 = WignerdMatrix(j, β)
+		    	d2 = WignerdMatrix(j, -β)
+		    	for m in axes(d1,1), n in axes(d1,2)
+		    		@test isapprox(d1[m,n],d2[n,m],atol=1e14,rtol=1e-8)
+		    	end
+		    end
+		end
+		@testset "π - β" begin
+		    for j in 0:1//2:2, β in -4π:π/4:4π
+		    	d1 = WignerdMatrix(j, β)
+		    	d2 = WignerdMatrix(j, π - β)
+		    	for m in axes(d1,1), n in axes(d1,2)
+		    		@test isapprox(d2[m,n],(-1)^(j-n) * d1[-m,n],atol=1e-14,rtol=1e-8)
+		    	end
+		    end
+		end
+		@testset "β + (2n+1)π" begin
+		    for j in 0:1//2:2, β in -4π:π/4:-4π, k = -1:1
+		    	d1 = WignerdMatrix(j, β)
+		    	d2 = WignerdMatrix(j, β + (2k+1)π)
+		    	d3 = WignerdMatrix(j, β - (2k+1)π)
+		    	for m in axes(d1,1), n in axes(d1,2)
+		    		@test isapprox(d2[m,n],(-1)^((2k+1)j-n) * d1[m,-n],atol=1e-14,rtol=1e-8)
+		    		@test isapprox(d3[m,n],(-1)^(-(2k+1)j-n) * d1[m,-n],atol=1e-14,rtol=1e-8)
+		    	end
+		    end
+		end
+	end
 	@testset "similar" begin
 	    d = WignerdMatrix(Float32, 1, π/3)
 	    d′ = similar(d)
@@ -384,37 +437,42 @@ end
 			β = π/4
 		    d = WignerdMatrix(1/2,β)
 		    @test tr(d) ≈ 2cos(β/2)
-		    @test tr(d) ≈ sum(d[m,m] for m=-1//2:1//2)
+		    @test isapprox(tr(d),sum(d[m,m] for m=-1//2:1//2),atol=1e-14,rtol=1e-8)
 
 		    d = WignerdMatrix(1/2,ZeroRadians())
 		    @test tr(d) == Float64(2)
 
 		    d = WignerdMatrix(1,β)
 		    @test tr(d) ≈ 1 + 2cos(β)
-		    @test tr(d) ≈ sum(d[m,m] for m=-1:1)
+		    @test isapprox(tr(d),sum(d[m,m] for m=-1:1),atol=1e-14,rtol=1e-8)
+		    @test isapprox(tr(d),tr(collect(d)),atol=1e-14,rtol=1e-8)
 
 		    d = WignerdMatrix(1,ZeroRadians())
 		    @test tr(d) == Float64(3)
 
 		    d = WignerdMatrix(3/2,β)
 		    @test tr(d) ≈ 2(cos(β/2) + cos(3β/2))
-		    @test tr(d) ≈ sum(d[m,m] for m=-3//2:3//2)
+		    @test isapprox(tr(d),sum(d[m,m] for m=-3//2:3//2),atol=1e-14,rtol=1e-8)
+		    @test isapprox(tr(d),tr(collect(d)),atol=1e-14,rtol=1e-8)
 
 		    d = WignerdMatrix(3/2,ZeroRadians())
 		    @test tr(d) == Float64(4)
 
 		    d = WignerdMatrix(2,β)
-		    @test tr(d) ≈ 1 + 2cos(β) + 2cos(2β)
-		    @test tr(d) ≈ sum(d[m,m] for m=-2:2)
+		    @test isapprox(tr(d),1 + 2cos(β) + 2cos(2β),atol=1e-14,rtol=1e-8)
+		    @test isapprox(tr(d),sum(d[m,m] for m=-2:2),atol=1e-14,rtol=1e-8)
+		    @test isapprox(tr(d), tr(collect(d)),atol=1e-14,rtol=1e-8)
 
 		    d = WignerdMatrix(2,ZeroRadians())
 		    @test tr(d) == Float64(5)
 		end
 		@testset "inv" begin
-			for β = π/3:π/3:4π, j in 1//2:1//2:2
+			rotangles = -4π:π/4:4π
+			for β = rotangles, j in 0:1//2:4
 				d = WignerdMatrix(j,β)
 				dinv = inv(d)
 				@test dinv isa WignerdMatrix
+				@test collect(dinv) ≈ inv(collect(d))
 				@test dinv * d ≈ I
 			end
 		end
@@ -497,6 +555,7 @@ end
 	    @test size(D′.dj) == size(D.dj)
 	end
 	@testset "LinearAlgebra" begin
+		rotangles = -4π:π/3:4π
 		@testset "product" begin
 			β = π/3
 			α,γ = π/6, π/2
@@ -523,25 +582,29 @@ end
 			end
 		end
 		@testset "det" begin
-			for j = [1/2, 1]
-				D = WignerDMatrix(j, π/2, π/3, π/4)
+			for j in 0:1//2:4, α in rotangles, 
+				β in rotangles, γ in rotangles
+
+				D = WignerDMatrix(j, α, β, γ)
 		    	@test det(D) == 1
 		    end
 		end
 		@testset "trace" begin
-			β = π/3
-			α,γ = π/6, π/2
-			for j in 1//2:1//2:2
+			for j in 0:1//2:2, α in rotangles, 
+				β in rotangles, γ in rotangles
 			    D = WignerDMatrix(j,α,β,γ)
-			    @test tr(D) ≈ sum(D[m,m] for m=-j:j)
+			    @test isapprox(tr(D),sum(D[m,m] for m=-j:j),atol=1e-14,rtol=1e-8)
+			    @test isapprox(tr(D),tr(collect(D)),atol=1e-14,rtol=1e-8)
 			end
 		end
 		@testset "inv" begin
-			α,γ = π/6, π/2
-			for β = π/3:π/3:4π, j in 1//2:1//2:2
+			for j in 0:1//2:4, α in rotangles, 
+				β in rotangles, γ in rotangles
+
 				D = WignerDMatrix(j,α,β,γ)
 				Dinv = inv(D)
 				@test Dinv isa WignerDMatrix
+				@test collect(Dinv) ≈ inv(collect(D))
 				@test Dinv * D ≈ I
 			end
 		end

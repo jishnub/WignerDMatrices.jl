@@ -24,7 +24,7 @@ function LinearAlgebra.tr(D::WignerDMatrix{T}) where {T}
 	α,β,γ = eulerangles(D)
 	ωby2 = acos(cos(β/2)cos((α+γ)/2))
 	x = sin((2j+1)ωby2)/sin(ωby2)
-	iszero(ωby2) ? oftype(x,twojp1(1)) : x
+	iszero(ωby2) ? oftype(x,twojp1(j)) : x
 end
 function LinearAlgebra.tr(d::WignerdMatrix)
 	j = sphericaldegree(d)
