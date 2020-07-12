@@ -5,3 +5,5 @@
 /Manifest.toml
 /dev/
 test/Manifest.toml
+docs/Manifest.toml
+docs/build/

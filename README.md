@@ -13,12 +13,11 @@ This carries out a passive rotation by the Euler angles `(α, β, γ)` in the `z
 
 # Creating the matrices
 
-Compute the Wigner d-matrix using the signature `WignerdMatrix(j, β)` and the D-matrix using `WignerdMatrix(j, α, β, γ)`. Here the angular momentum `j` may either be an integer or a half-integer.
+Compute the Wigner d-matrix using the signature `WignerdMatrix(j, β)` and the D-matrix using `WignerdMatrix(j, α, β, γ)`, where the angular momentum `j` may either be an integer or a half-integer.
 
 ```julia
 julia> d = WignerdMatrix(2, π/3)
-Wigner d-matrix with j = 2 and β = 1.0471975511965976
-5×5 Array{Float64,2}:
+5×5 WignerdMatrix{Float64} for j = 2 and beta = 1.0471975511965976 with indices -2:2×-2:2:
   0.5625     0.649519      0.459279   0.216506     0.0625
  -0.649519   5.82867e-16   0.53033    0.5          0.216506
   0.459279  -0.53033      -0.125      0.53033      0.459279
@@ -26,28 +25,12 @@ Wigner d-matrix with j = 2 and β = 1.0471975511965976
   0.0625    -0.216506      0.459279  -0.649519     0.5625
 
 julia> D = WignerDMatrix(1/2, 0, π/3, 0.5)
-Wigner D-matrix with j = 1/2, with α = 0, β = 1.0471975511965976 and γ = 0.5
-2×2 Array{Complex{Float64},2}:
+2×2 WignerDMatrix{Complex{Float64}} for j = 1/2, alpha = 0, beta = 1.0471975511965976 and gamma = 0.5 with indices -1/2:1/2×-1/2:1/2:
   0.839103+0.214258im  0.484456-0.123702im
  -0.484456-0.123702im  0.839103-0.214258im
 ```
 
-Optionally the element type of the matrix may be specified as the first argument.
-
-The value of `β` may be updated using the mutating function `WignerdMatrix!`.
-
-```julia
-julia> WignerdMatrix!(d, π/10)
-Wigner d-matrix with j = 2 and β = 0.3141592653589793
-5×5 Array{Float64,2}:
-  0.951655      0.301455     0.0584764   0.00756218  0.000598866
- -0.301455      0.880037     0.359943    0.0710198   0.00756218
-  0.0584764    -0.359943     0.856763    0.359943    0.0584764
- -0.00756218    0.0710198   -0.359943    0.880037    0.301455
-  0.000598866  -0.00756218   0.0584764  -0.301455    0.951655
-```
-
-While the values of `α` and `γ` are stored in a `WignerDMatrix`, that of `β` is stored in the underlying `WignerdMatrix`. The way to obtain all the angles is 
+The way to obtain the Euler angles corresponding to the D or the d matrix is using the function `eulerangles`.
 
 ```julia
 julia> D = WignerDMatrix(1/2, 0, π/3, 0.5);
@@ -58,55 +41,59 @@ julia> WignerDMatrices.eulerangles(D)
 
 # Indexing
 
-The matrices may be indexed using appropriate `(m,n)` pairs. These must be integers if `j` is an integer, or half-integers if `j` is a half-integer as well.
+The matrices may be indexed using appropriate `(m,n)` pairs. These must be integers if `j` is an integer, or half-integers if `j` is a half-integer.
 
 ```julia
-julia> d[1, 1]
-0.8800367553350505
+julia> d = WignerdMatrix(2, π/3);
+
+julia> d[-2,-2]
+0.5625000000000003
+
+julia> D = WignerDMatrix(1/2, 0, π/3, 0.5);
 
 julia> D[-1/2, 1/2]
 0.4844562108553222 - 0.12370197962726143im
 ```
 
-The structs are defined to respect the symmetries of the d-matrix.
+The structs are defined to respect the symmetries of the d-matrix. In particular, this means that `d[-m,-n] = (-1)^(m-n) d[m,n]`, `d[n,m] = (-1)^(m-n) d[m,n]` and `d[-n,-m] = d[m,n]`.
 
 # Special Angles
 
-The package provides the three special angles `ZeroRadians`, `Piby2Radians` and `PiRadians`. Using these might lead to certain elements of the d-matrix being explicitly evaluated to zero.
+The package provides the special angles `ZeroRadians`, `Piby2Radians`, `PiRadians`, `TwoNPiRadians` and `TwoNPlusOnePiRadians`, and correspondingly the constants `Zero`, `Pi`, `TwoPi`, `ThreePi`, `FourPi` and `Piby2`. Using these might lead to certain elements of the d-matrix being explicitly evaluated to zero, which would lead to faster construction and indexing. The generic types are defined as `TwoNPiRadians(m) = 2mπ` and `TwoNPlusOnePiRadians(m) = (2m + 1)π`. Neither the types nor the constants are exported to avoid conflicts with other packages.
 
 ```julia
-julia> WignerdMatrix(1, WignerDMatrices.Piby2Radians())
-Wigner d-matrix with j = 1 and β = Piby2Radians()
-3×3 Array{Float64,2}:
-  0.5        0.707107  0.5
- -0.707107   0.0       0.707107
-  0.5       -0.707107  0.5
+julia> WignerdMatrix(1, π/2)[0,0]
+6.12323399573689e-17
 
-julia> WignerdMatrix(1, π/2)
-Wigner d-matrix with j = 1 and β = 1.5707963267948966
-3×3 Array{Float64,2}:
-  0.5        0.707107     0.5
- -0.707107   6.12323e-17  0.707107
-  0.5       -0.707107     0.5
-
-julia> WignerdMatrix(1, WignerDMatrices.PiRadians())
-Wigner d-matrix with j = 1 and β = PiRadians()
-3×3 Array{Float64,2}:
- 0.0  -0.0   1.0
- 0.0  -1.0  -0.0
- 1.0   0.0   0.0
+julia> WignerdMatrix(1, WignerDMatrices.Piby2)[0,0]
+0.0
 
 julia> WignerdMatrix(1, π)
-Wigner d-matrix with j = 1 and β = π
-3×3 Array{Float64,2}:
- -2.27596e-15   8.65956e-17   1.0
- -8.65956e-17  -1.0           8.65956e-17
-  1.0          -8.65956e-17  -2.27596e-15
-```
+3×3 WignerdMatrix{Float64} for j = 1 and beta = π with indices -1:1×-1:1:
+ 0.0   0.0  1.0
+ 0.0  -1.0  0.0
+ 1.0   0.0  0.0
 
-Note that using the mutating function `WignerMatrix!` on a d-matrix defined using a special angle where the new angle is a floating-point number will not work.
+julia> WignerdMatrix(1, WignerDMatrices.Pi)
+3×3 WignerdMatrix{Float64} for j = 1 and beta = Pi with indices -1:1×-1:1:
+  ⋅     ⋅   1.0
+  ⋅   -1.0   ⋅ 
+ 1.0    ⋅    ⋅ 
+
+# Indexing is faster
+
+julia> d1 = WignerdMatrix(40, WignerDMatrices.Zero);
+
+julia> d2 = WignerdMatrix(40, 0);
+
+julia> @btime $d1[1,1];
+  4.797 ns (0 allocations: 0 bytes)
+
+julia> @btime $d2[1,1];
+  13.249 ns (0 allocations: 0 bytes)
+```
 
 # Limitations
 
- * Broadcasting does not work currently.
+ * WignerDMatrix types are not closed on matrix multiplication
  * Much of linear-algebra is not implemented for half-integer axes

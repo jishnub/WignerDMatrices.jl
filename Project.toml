@@ -1,13 +1,15 @@
 name = "WignerDMatrices"
 uuid = "1ae92946-bcd2-426a-bfea-2fc5f607c187"
-authors = ["Jishnu Bhattacharya", "Center for Space Science", "New York University Abu Dhabi"]
+authors = ["Jishnu Bhattacharya"]
 version = "0.1.0"
 
 [deps]
+HalfIntegerArrays = "8d01e2c4-1bfe-4abb-85d1-ae030bc38508"
 HalfIntegers = "f0d1745a-41c9-11e9-1dd9-e5d34d218721"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
+HalfIntegerArrays = "0.1.2"
 HalfIntegers = "1"
 julia = "1.2"
 

@@ -3,7 +3,12 @@ using HalfIntegers
 using LinearAlgebra
 using Test
 
-import WignerDMatrices: cis_special, Piby2Radians, ZeroRadians, PiRadians
+import WignerDMatrices: cis_special, Piby2Radians, ZeroRadians,
+TwoNPiRadians, TwoNPlusOnePiRadians
+import WignerDMatrices: WignerdMatrixContainer, flatind, filledelements, 
+flatind_phase, sphericaldegree
+
+@test isempty(Test.detect_ambiguities(Base, Core, WignerDMatrices))
 
 @testset "special points" begin
 	@testset "float" begin
@@ -11,99 +16,271 @@ import WignerDMatrices: cis_special, Piby2Radians, ZeroRadians, PiRadians
 		    @test float(Piby2Radians()) == π/2
 	    	@test AbstractFloat(Piby2Radians()) == π/2
 	    	@test Float64(Piby2Radians()) == π/2
+	    	@test float(Piby2Radians{BigFloat}()) == big(π)/2
+	    	@test Float64(Piby2Radians{BigFloat}()) == π/2
 		end
 		@testset "ZeroRadians" begin
 			@test float(ZeroRadians()) == 0
 	    	@test AbstractFloat(ZeroRadians()) == 0
 	    	@test Float64(ZeroRadians()) == 0
+	    	@test float(ZeroRadians{BigFloat}()) isa BigFloat
+	    	@test float(ZeroRadians{BigFloat}()) == big(0.0)
 		end
-		@testset "PiRadians" begin
-			@test float(PiRadians()) == float(π)
-	    	@test AbstractFloat(PiRadians()) == float(π)
-	    	@test Float64(PiRadians()) == float(π)
+		@testset "TwoNPiRadians" begin
+		    @test float(TwoNPiRadians(1)) == 2π
+		    @test float(TwoNPiRadians{BigFloat}(1)) == big(2)*π
+		    @test float(TwoNPiRadians(-1)) == -2π
+		    @test float(TwoNPiRadians{BigFloat}(-1)) == big(-2)*π
+		end
+		@testset "TwoNPlusOnePiRadians" begin
+		   	@test float(TwoNPlusOnePiRadians(1)) == 3π
+		    @test float(TwoNPlusOnePiRadians{BigFloat}(1)) == big(3)*π
+		   	@test float(TwoNPlusOnePiRadians(-1)) == -π
+		    @test float(TwoNPlusOnePiRadians{BigFloat}(-1)) == big(-1)*π
+		end
+		@testset "TwoNPiRadians and ZeroRadians" begin
+		    @test float(TwoNPiRadians(0)) == float(ZeroRadians())
+		    @test float(TwoNPiRadians{BigFloat}(0)) == float(ZeroRadians{BigFloat}())
 		end
 	end
 	@testset "promote" begin
 		for T in [Int,Float32,Float64]
-		    @test promote_rule(Piby2Radians,T) == Float64
-		    @test promote_rule(ZeroRadians,T) == Float64
-		    @test promote_rule(PiRadians,T) == Float64
+		    @test promote_rule(Piby2Radians{Float64},T) == Float64
+		    @test promote_rule(ZeroRadians{Float64},T) == Float64
+		end
+		for T in [Int,Float32,Float64]
+		    @test promote_rule(Piby2Radians{BigFloat},T) == BigFloat
+		    @test promote_rule(ZeroRadians{BigFloat},T) == BigFloat
 		end
 		for T in [BigFloat]
-			@test promote_rule(Piby2Radians,T) == BigFloat
-			@test promote_rule(ZeroRadians,T) == BigFloat
-		    @test promote_rule(PiRadians,T) == BigFloat
+			@test promote_rule(Piby2Radians{Float64},T) == BigFloat
+			@test promote_rule(ZeroRadians{Float64},T) == BigFloat
 		end
 	end
 	@testset "zero and one" begin
+		function test(T, n...)
+			@test zero(T(n...)) == zero(Float64)
+	    	@test one(T(n...)) == one(Float64)
+		    @test zero(T{BigFloat}(n...)) isa BigFloat
+		    @test zero(T{BigFloat}(n...)) == zero(BigFloat)
+	    	@test one(T{BigFloat}(n...)) isa BigFloat
+	    	@test one(T{BigFloat}(n...)) == one(BigFloat)
+		end
 		@testset "Piby2Radians" begin
-		    @test zero(Piby2Radians()) == zero(Float64)
-	    	@test one(Piby2Radians()) == one(Float64)
+		    test(Piby2Radians)
 		end
 		@testset "ZeroRadians" begin
-    		@test zero(ZeroRadians()) == zero(Float64)
-    		@test one(ZeroRadians()) == one(Float64)
+			test(ZeroRadians)
 		end
-		@testset "PiRadians" begin
-	    	@test zero(PiRadians()) == zero(Float64)
-	    	@test one(PiRadians()) == one(Float64)
+		@testset "TwoNPiRadians" begin
+		   	test(TwoNPiRadians, 1)
+		end
+		@testset "TwoNPlusOnePiRadians" begin
+		   	test(TwoNPlusOnePiRadians, 1) 
+		end
+	end
+	@testset "negate" begin
+	    @test -ZeroRadians() == ZeroRadians()
+	    @test -Piby2Radians() == -π/2
+	    @test -Piby2Radians{BigFloat}() == -big(π)/2
+	    @test -TwoNPlusOnePiRadians{BigFloat}(0) == -big(π)
+	    @test -TwoNPiRadians(1) == -2π
+	    @test -TwoNPiRadians{BigFloat}(1) == -2big(π)
+	    @test -TwoNPlusOnePiRadians(1) == -3π
+	    @test -TwoNPlusOnePiRadians{BigFloat}(1) == -3big(π)
+	end
+	@testset "add" begin
+		@testset "ZeroRadians" begin
+			@test ZeroRadians() + ZeroRadians() == ZeroRadians()
+	    	@test ZeroRadians{Float64}() + ZeroRadians{BigFloat}() === ZeroRadians{BigFloat}()
+	    	@test ZeroRadians{BigFloat}() + ZeroRadians{Float64}() === ZeroRadians{BigFloat}()
+
+	    	@test ZeroRadians() + Piby2Radians() == Piby2Radians()
+	    	@test ZeroRadians() + Piby2Radians{BigFloat}() == Piby2Radians{BigFloat}()
+	    	@test ZeroRadians{BigFloat}() + Piby2Radians() == Piby2Radians{BigFloat}()
+	    	
+	    	@test ZeroRadians() + TwoNPiRadians(1) == TwoNPiRadians(1)
+	    	@test ZeroRadians() + TwoNPiRadians{BigFloat}(1) == TwoNPiRadians{BigFloat}(1)
+	    	@test ZeroRadians{BigFloat}() + TwoNPiRadians(1) == TwoNPiRadians{BigFloat}(1)
+	    	
+	    	@test ZeroRadians() + TwoNPlusOnePiRadians(1) == TwoNPlusOnePiRadians(1)
+	    	@test ZeroRadians() + TwoNPlusOnePiRadians{BigFloat}(1) == TwoNPlusOnePiRadians{BigFloat}(1)
+	    	@test ZeroRadians{BigFloat}() + TwoNPlusOnePiRadians(1) == TwoNPlusOnePiRadians{BigFloat}(1)
+		end
+		@testset "Piby2Radians" begin
+			@test Piby2Radians() + Piby2Radians() == TwoNPlusOnePiRadians(0)
+	    	@test Piby2Radians{Float64}() + Piby2Radians{BigFloat}() === TwoNPlusOnePiRadians{BigFloat}(0)
+	    	@test Piby2Radians{BigFloat}() + Piby2Radians{Float64}() === TwoNPlusOnePiRadians{BigFloat}(0)
+
+	    	@test Piby2Radians() + ZeroRadians() == Piby2Radians()
+	    	@test Piby2Radians{BigFloat}() + ZeroRadians() == Piby2Radians{BigFloat}()
+	    	@test Piby2Radians() + ZeroRadians{BigFloat}() == Piby2Radians{BigFloat}()
+
+	    	@test Piby2Radians() + TwoNPiRadians(1) == 5π/2
+	    	@test Piby2Radians() + TwoNPiRadians{BigFloat}(1) == 5big(π)/2
+	    	@test Piby2Radians{BigFloat}() + TwoNPiRadians(1) == 5big(π)/2
+
+	    	@test Piby2Radians() + TwoNPlusOnePiRadians(1) == 7π/2
+	    	@test Piby2Radians{BigFloat}() + TwoNPlusOnePiRadians(1) == 7big(π)/2
+	    	@test Piby2Radians() + TwoNPlusOnePiRadians{BigFloat}(1) == 7big(π)/2
+		end
+		@testset "TwoNPiRadians" begin
+		    @test TwoNPiRadians(1) + TwoNPiRadians(1) == TwoNPiRadians(2)
+	    	@test TwoNPiRadians{Float64}(1) + TwoNPiRadians{BigFloat}(1) === TwoNPiRadians{BigFloat}(2)
+	    	@test TwoNPiRadians{BigFloat}(1) + TwoNPiRadians{Float64}(1) === TwoNPiRadians{BigFloat}(2)
+
+	    	@test TwoNPiRadians(1) + ZeroRadians() == TwoNPiRadians(1)
+	    	@test TwoNPiRadians{BigFloat}(1) + ZeroRadians() == TwoNPiRadians{BigFloat}(1)
+	    	@test TwoNPiRadians(1) + ZeroRadians{BigFloat}() == TwoNPiRadians{BigFloat}(1)
+
+	    	@test TwoNPiRadians(1) + Piby2Radians() == 5π/2
+	    	@test TwoNPiRadians{BigFloat}(1) + Piby2Radians() == 5big(π)/2
+	    	@test TwoNPiRadians(1) + Piby2Radians{BigFloat}() == 5big(π)/2
+
+	    	@test TwoNPiRadians(1) + TwoNPlusOnePiRadians(0) == TwoNPlusOnePiRadians(1)
+	    	@test TwoNPiRadians{BigFloat}(1) + TwoNPlusOnePiRadians(0) == TwoNPlusOnePiRadians{BigFloat}(1)
+	    	@test TwoNPiRadians(1) + TwoNPlusOnePiRadians{BigFloat}(0) == TwoNPlusOnePiRadians{BigFloat}(1)
+
+	    	@test TwoNPiRadians(1) + TwoNPlusOnePiRadians(1) == TwoNPlusOnePiRadians(2)
+	    	@test TwoNPiRadians{BigFloat}(1) + TwoNPlusOnePiRadians(1) == TwoNPlusOnePiRadians{BigFloat}(2)
+	    	@test TwoNPiRadians(1) + TwoNPlusOnePiRadians{BigFloat}(1) == TwoNPlusOnePiRadians{BigFloat}(2)
+		end
+		@testset "TwoNPlusOnePiRadians" begin
+		    @test TwoNPlusOnePiRadians(1) + TwoNPlusOnePiRadians(1) == TwoNPiRadians(3)
+	    	@test TwoNPlusOnePiRadians{Float64}(1) + TwoNPlusOnePiRadians{BigFloat}(1) === TwoNPiRadians{BigFloat}(3)
+	    	@test TwoNPlusOnePiRadians{BigFloat}(1) + TwoNPlusOnePiRadians{Float64}(1) === TwoNPiRadians{BigFloat}(3)
+
+	    	@test TwoNPlusOnePiRadians(1) + ZeroRadians() == TwoNPlusOnePiRadians(1)
+	    	@test TwoNPlusOnePiRadians{BigFloat}(1) + ZeroRadians() == TwoNPlusOnePiRadians{BigFloat}(1)
+	    	@test TwoNPlusOnePiRadians(1) + ZeroRadians{BigFloat}() == TwoNPlusOnePiRadians{BigFloat}(1)
+
+	    	@test TwoNPlusOnePiRadians(1) + Piby2Radians() == 7π/2
+	    	@test TwoNPlusOnePiRadians{BigFloat}(1) + Piby2Radians() == 7big(π)/2
+	    	@test TwoNPlusOnePiRadians(1) + Piby2Radians{BigFloat}() == 7big(π)/2
+
+	    	@test TwoNPlusOnePiRadians(1) + TwoNPlusOnePiRadians(0) == TwoNPiRadians(2)
+	    	@test TwoNPlusOnePiRadians{BigFloat}(1) + TwoNPlusOnePiRadians(0) == TwoNPiRadians{BigFloat}(2)
+	    	@test TwoNPlusOnePiRadians(1) + TwoNPlusOnePiRadians{BigFloat}(0) == TwoNPiRadians{BigFloat}(2)
+
+	    	@test TwoNPlusOnePiRadians(1) + TwoNPiRadians(1) == TwoNPlusOnePiRadians(2)
+	    	@test TwoNPlusOnePiRadians(1) + TwoNPiRadians{BigFloat}(1) == TwoNPlusOnePiRadians{BigFloat}(2)
+	    	@test TwoNPlusOnePiRadians{BigFloat}(1) + TwoNPiRadians(1) == TwoNPlusOnePiRadians{BigFloat}(2)
 		end
 	end
 	@testset "trigonometric functions" begin
 	    @testset "Piby2Radians" begin
-			@test one(Piby2Radians()) == 1
 		    for α = -10:1//2:10
+		    	@test cis_special(HalfInt(α),Piby2Radians()) isa ComplexF64
 		    	@test cis_special(HalfInt(α),Piby2Radians()) ≈ cis(α*π/2)
+		    	@test cis_special(HalfInt(α),Piby2Radians{BigFloat}()) isa Complex{BigFloat}
+		    	@test cis_special(HalfInt(α),Piby2Radians{BigFloat}()) ≈ cis(α*big(π)/2)
 		    end
 	    	@test cos(Piby2Radians()) == 0
+	    	@test cos(Piby2Radians{BigFloat}()) isa BigFloat
+	    	@test cos(Piby2Radians{BigFloat}()) == 0
 	    	@test sin(Piby2Radians()) == 1
+	    	@test sin(Piby2Radians{BigFloat}()) isa BigFloat
+	    	@test sin(Piby2Radians{BigFloat}()) == 1
 		end
-		@testset "North Pole" begin
+		@testset "ZeroRadians" begin
 			for α = -10:1//2:10
+		    	@test cis_special(HalfInt(α),ZeroRadians()) isa ComplexF64
 		    	@test cis_special(HalfInt(α),ZeroRadians()) ≈ cis(0)
+		    	@test cis_special(HalfInt(α),ZeroRadians{BigFloat}()) isa Complex{BigFloat}
+		    	@test cis_special(HalfInt(α),ZeroRadians{BigFloat}()) ≈ cis(big(0))
 		    end
 		    @test cos(ZeroRadians()) == 1
+		    @test cos(ZeroRadians{BigFloat}()) isa BigFloat
+		    @test cos(ZeroRadians{BigFloat}()) == 1
 	    	@test sin(ZeroRadians()) == 0
+	    	@test sin(ZeroRadians{BigFloat}()) isa BigFloat
+	    	@test sin(ZeroRadians{BigFloat}()) == 0
 		end
-		@testset "South Pole" begin
-			for α = -10:1//2:10
-		    	@test cis_special(HalfInt(α),PiRadians()) ≈ cis(α*π)
+		@testset "TwoNPiRadians" begin
+		    for α = -10:1//2:10
+		    	@test cis_special(HalfInt(α),TwoNPiRadians(1)) isa ComplexF64
+		    	@test cis_special(HalfInt(α),TwoNPiRadians(1)) ≈ cis(α*2π)
+		    	@test cis_special(HalfInt(α),TwoNPiRadians{BigFloat}(1)) isa Complex{BigFloat}
+		    	@test cis_special(HalfInt(α),TwoNPiRadians{BigFloat}(1)) ≈ cis(α*2big(π))
 		    end
-		    @test cos(PiRadians()) == -1
-	    	@test sin(PiRadians()) == 0
+		    for n = -3:3
+			    @test cos(TwoNPiRadians(n)) == 1
+			    @test cos(TwoNPiRadians{BigFloat}(n)) isa BigFloat
+			    @test cos(TwoNPiRadians{BigFloat}(n)) == 1
+		    	@test sin(TwoNPiRadians(n)) == 0
+		    	@test sin(TwoNPiRadians{BigFloat}(n)) isa BigFloat
+		    	@test sin(TwoNPiRadians{BigFloat}(n)) == 0
+		    end
+		end
+		@testset "TwoNPlusOnePiRadians" begin
+		    for α = -10:1//2:10
+		    	@test cis_special(HalfInt(α),TwoNPlusOnePiRadians(1)) isa ComplexF64
+		    	@test cis_special(HalfInt(α),TwoNPlusOnePiRadians(1)) ≈ cis(α*3π)
+		    	@test cis_special(HalfInt(α),TwoNPlusOnePiRadians{BigFloat}(1)) isa Complex{BigFloat}
+		    	@test cis_special(HalfInt(α),TwoNPlusOnePiRadians{BigFloat}(1)) ≈ cis(α*3big(π))
+		    end
+		    for n = -3:3
+			    @test cos(TwoNPlusOnePiRadians(n)) == -1
+			    @test cos(TwoNPlusOnePiRadians{BigFloat}(n)) isa BigFloat
+			    @test cos(TwoNPlusOnePiRadians{BigFloat}(n)) == -1
+		    	@test sin(TwoNPlusOnePiRadians(n)) == 0
+		    	@test sin(TwoNPlusOnePiRadians{BigFloat}(n)) isa BigFloat
+		    	@test sin(TwoNPlusOnePiRadians{BigFloat}(n)) == 0
+		    end
 		end
 	end
-	@testset "djmatrix_terms" begin
+	@testset "wignerdmatrixelement" begin
 		function testapprox(m,n,dj_m_n,dj_m_n2)
 	    	@test begin 
-	    		res = isapprox(dj_m_n,dj_m_n2,atol=1e-14,rtol=sqrt(eps(Float64)))
+	    		res = isapprox(dj_m_n,dj_m_n2,atol=1e-13,rtol=sqrt(eps(Float64)))
 	    		if !res
 	    			@show m n dj_m_n dj_m_n2
 	    		end
 	    		res
 	    	end
 	    end
-	    function tests(j,λ,v)
+	    function tests(j,v)
 	    	@testset "Piby2Radians" begin
 		        for m in -j:j, n in -j:j
-		        	dj_m_n = WignerDMatrices.djmatrix_terms(π/2,λ,v,m,n,j)
-		        	dj_m_n2 = WignerDMatrices.djmatrix_terms(Piby2Radians(),λ,v,m,n,j)
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,π/2 ,v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,Piby2Radians(),v)
 
 		        	testapprox(m,n,dj_m_n,dj_m_n2)
 		        end
 		    end
 		    @testset "ZeroRadians" begin
 		        for m in -j:j, n in -j:j
-		        	dj_m_n = WignerDMatrices.djmatrix_terms(0,λ,v,m,n,j)
-		        	dj_m_n2 = WignerDMatrices.djmatrix_terms(ZeroRadians(),λ,v,m,n,j)
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,0,v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,ZeroRadians(),v)
 
 		        	testapprox(m,n,dj_m_n,dj_m_n2)
 		        end
 		    end
-		    @testset "PiRadians" begin
+		    @testset "TwoNPiRadians" begin
 		        for m in -j:j, n in -j:j
-		        	dj_m_n = WignerDMatrices.djmatrix_terms(π,λ,v,m,n,j)
-		        	dj_m_n2 = WignerDMatrices.djmatrix_terms(PiRadians(),λ,v,m,n,j)
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,2π,v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,TwoNPiRadians(1),v)
+
+		        	testapprox(m,n,dj_m_n,dj_m_n2)
+
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,0,v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,TwoNPiRadians(0),v)
+
+		        	testapprox(m,n,dj_m_n,dj_m_n2)
+		        	
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,ZeroRadians(),v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,TwoNPiRadians(0),v)
+
+		        	testapprox(m,n,dj_m_n,dj_m_n2)
+		        end
+		    end
+		    @testset "TwoNPlusOnePiRadians" begin
+		        for m in -j:j, n in -j:j
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,3π,v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,WignerDMatrices.ThreePi,v)
+
+		        	dj_m_n = WignerDMatrices.wignerdmatrixelement(j,m,n,π,v)
+		        	dj_m_n2 = WignerDMatrices.wignerdmatrixelement(j,m,n,WignerDMatrices.Pi,v)
 
 		        	testapprox(m,n,dj_m_n,dj_m_n2)
 		        end
@@ -111,22 +288,159 @@ import WignerDMatrices: cis_special, Piby2Radians, ZeroRadians, PiRadians
 		end
 
 		@testset "integer j" begin
-		    j = 5
-			A = zeros(ComplexF64,2j+1,2j+1)
-		    v = WignerDMatrices.Jy_eigen!(j,A)
-		    λ = -j:j
+		    for j = 0:10
+				A = zeros(ComplexF64,2j+1,2j+1)
+			    v = WignerDMatrices.eigenvecsJy!(j,A)
 
-		    tests(j,λ,v)
+			    tests(j,v)
+			end
 		end
 		@testset "half-integer j" begin
-		    j = 3//2
-			A = zeros(ComplexF64,Int(2j+1),Int(2j+1))
-		    v = WignerDMatrices.Jy_eigen!(HalfInt(j),A)
-		    λ = -j:j
+			for j = 1//2:19//2
+				A = zeros(ComplexF64,Int(2j+1),Int(2j+1))
+			    v = WignerDMatrices.eigenvecsJy!(HalfInt(j),A)
 
-		    tests(j,λ,v)
+		    	tests(j,v)
+		    end
 		end
 	end
+end
+@testset "WignerdMatrixContainer" begin
+    @testset "flatind" begin
+    	@testset "j = 1/2" begin
+    	    j = HalfInt(1/2)
+    	    @test filledelements(j) == 2
+    	    @test flatind(j, 1, 1) == 1
+            @test flatind(j, 2, 1) == 2
+    	end
+    	@testset "j = 1" begin
+        	j = 1
+        	@test filledelements(j) == 4
+            @test flatind(j, 1, 1) == 1
+            @test flatind(j, 2, 1) == 2
+            @test flatind(j, 3, 1) == 3
+            @test flatind(j, 2, 2) == 4
+        end
+    	@testset "j = 3/2" begin
+        	j = HalfInt(3/2)
+        	@test filledelements(j) == 6
+            @test flatind(j, 1, 1) == 1
+            @test flatind(j, 2, 1) == 2
+            @test flatind(j, 3, 1) == 3
+            @test flatind(j, 4, 1) == 4
+            @test flatind(j, 2, 2) == 5
+            @test flatind(j, 3, 2) == 6
+        end
+        @testset "j = 2" begin
+        	j = 2
+        	@test filledelements(j) == 9
+            @test flatind(j, 1, 1) == 1
+            @test flatind(j, 2, 1) == 2
+            @test flatind(j, 3, 1) == 3
+            @test flatind(j, 4, 1) == 4
+            @test flatind(j, 5, 1) == 5
+            @test flatind(j, 2, 2) == 6
+            @test flatind(j, 3, 2) == 7
+            @test flatind(j, 4, 2) == 8
+            @test flatind(j, 3, 3) == 9
+        end
+    end
+    @testset "flating phase" begin
+        @testset "j = 1/2" begin
+			j = HalfInt(1/2)
+			@testset "saved" begin
+				@test flatind_phase(j, 1, 1) == (1, 1)
+				@test flatind_phase(j, 2, 1) == (2, 1)
+			end
+			@testset "right" begin
+				@test flatind_phase(j, 1, 2) == (2, -1)
+				@test flatind_phase(j, 2, 2) == (1, 1)
+			end
+    	end
+    	@testset "j = 1" begin
+        	j = 1
+        	@testset "saved" begin
+	            @test flatind_phase(j, 1, 1) == (1, 1)
+	            @test flatind_phase(j, 2, 1) == (2, 1)
+	            @test flatind_phase(j, 3, 1) == (3, 1)
+            	@test flatind_phase(j, 2, 2) == (4, 1)
+        	end
+        	@testset "top" begin
+            	@test flatind_phase(j, 1, 2) == (2, -1)
+        	end
+        	@testset "bottom" begin
+            	@test flatind_phase(j, 3, 2) == (2, 1)
+        	end
+        	@testset "right" begin
+            	@test flatind_phase(j, 1, 3) == (3, 1)
+	            @test flatind_phase(j, 2, 3) == (2, -1)
+	            @test flatind_phase(j, 3, 3) == (1, 1)
+        	end
+        end
+    	@testset "j = 3/2" begin
+        	j = HalfInt(3/2)
+        	@testset "saved" begin
+	        	@test flatind_phase(j, 1, 1) == (1, 1)
+	            @test flatind_phase(j, 2, 1) == (2, 1)
+	            @test flatind_phase(j, 3, 1) == (3, 1)
+	            @test flatind_phase(j, 4, 1) == (4, 1)
+	            @test flatind_phase(j, 2, 2) == (5, 1)
+	            @test flatind_phase(j, 3, 2) == (6, 1)
+        	end
+        	@testset "top" begin
+            	@test flatind_phase(j, 1, 2) == (2, -1)
+            	@test flatind_phase(j, 1, 3) == (3, 1)
+        	end
+        	@testset "bottom" begin
+            	@test flatind_phase(j, 4, 2) == (3, 1)
+            	@test flatind_phase(j, 4, 3) == (2, 1)
+        	end
+        	@testset "right" begin
+	            @test flatind_phase(j, 2, 3) == (6, -1)
+	            @test flatind_phase(j, 3, 3) == (5, 1)
+	            @test flatind_phase(j, 1, 4) == (4, -1)
+	            @test flatind_phase(j, 2, 4) == (3, 1)
+	            @test flatind_phase(j, 3, 4) == (2, -1)
+	            @test flatind_phase(j, 4, 4) == (1, 1)
+        	end
+        end
+        @testset "j = 2" begin
+        	j = 2
+        	@testset "saved" begin
+	        	@test flatind_phase(j, 1, 1) == (1, 1)
+	            @test flatind_phase(j, 2, 1) == (2, 1)
+	            @test flatind_phase(j, 3, 1) == (3, 1)
+	            @test flatind_phase(j, 4, 1) == (4, 1)
+	            @test flatind_phase(j, 5, 1) == (5, 1)
+	            @test flatind_phase(j, 2, 2) == (6, 1)
+	            @test flatind_phase(j, 3, 2) == (7, 1)
+	            @test flatind_phase(j, 4, 2) == (8, 1)
+            	@test flatind_phase(j, 3, 3) == (9, 1)
+        	end
+        	@testset "top" begin
+            	@test flatind_phase(j, 1, 2) == (2, -1)
+            	@test flatind_phase(j, 1, 3) == (3, 1)
+            	@test flatind_phase(j, 1, 4) == (4, -1)
+            	@test flatind_phase(j, 2, 3) == (7, -1)
+        	end
+        	@testset "bottom" begin
+            	@test flatind_phase(j, 5, 2) == (4, 1)
+            	@test flatind_phase(j, 5, 3) == (3, 1)
+            	@test flatind_phase(j, 5, 4) == (2, 1)
+            	@test flatind_phase(j, 4, 3) == (7, 1)
+        	end
+        	@testset "right" begin
+	            @test flatind_phase(j, 2, 4) == (8, 1)
+	            @test flatind_phase(j, 3, 4) == (7, -1)
+	            @test flatind_phase(j, 4, 4) == (6, 1)
+	            @test flatind_phase(j, 1, 5) == (5, 1)
+	            @test flatind_phase(j, 2, 5) == (4, -1)
+	            @test flatind_phase(j, 3, 5) == (3, 1)
+	            @test flatind_phase(j, 4, 5) == (2, -1)
+	            @test flatind_phase(j, 5, 5) == (1, 1)
+        	end
+        end
+    end
 end
 @testset "Jy" begin
 	jmax = 2
@@ -158,10 +472,6 @@ end
     end
 end
 @testset "WignerdMatrix" begin
-	@testset "promote_type_phase" begin
-	    @test WignerDMatrices.promote_type_phase(Float64) == Float64
-	    @test WignerDMatrices.promote_type_phase(Float32) == Float32
-	end
 	@testset "Constructor" begin
 		β = π/3
 		@testset "integer j" begin
@@ -169,7 +479,7 @@ end
 			jh = HalfInt(j)
 			d = WignerdMatrix(j,β)
 			@test WignerDMatrices.sphericaldegree(d) == j
-			@test d.β == β
+			@test d.beta == β
 			@test WignerDMatrices.eulerangles(d) == (zero(β),β,zero(β))
 			@test axes(d) == (-jh:jh,-jh:jh)
 			@test axes(d,1) == axes(d,2) == -jh:jh
@@ -177,16 +487,6 @@ end
 			@test size(d,1) == size(d,2) == Integer(2j+1)
 
 			@test d == d
-
-			d = WignerdMatrix(j, 0.0, zeros(WignerDMatrices.filledelements(j)+1))
-			@test WignerDMatrices.sphericaldegree(d) == j
-			@test axes(d) == (-jh:jh,-jh:jh)
-
-			d = WignerdMatrix(j, 0.0, zeros(WignerDMatrices.filledelements(j)))
-			@test WignerDMatrices.sphericaldegree(d) == j
-			@test axes(d) == (-jh:jh,-jh:jh)
-
-			@test_throws ArgumentError WignerdMatrix(j, 0.0, zeros(0))
 
 			for i in eachindex(d.dj)
 				@test d[i] == d.dj[i]
@@ -197,7 +497,7 @@ end
 			jh = HalfInt(j)
 			d = WignerdMatrix(j,β)
 			@test WignerDMatrices.sphericaldegree(d) == j
-			@test d.β == β
+			@test d.beta == β
 			@test WignerDMatrices.eulerangles(d) == (zero(β),β,zero(β))
 			@test axes(d) == (-jh:jh,-jh:jh)
 			@test axes(d,1) == axes(d,2) == -jh:jh
@@ -207,13 +507,10 @@ end
 			for i in eachindex(d.dj)
 				@test d[i] == d.dj[i]
 			end
-
-			d[1] = 4
-			@test d[1] ≈ 4
 		end
 	end
 	function checkdjvalues(test,j,n)
-		for β in LinRange(π/n,π-π/n,2n+1)
+		for β in LinRange(0, 4π, n)
 			d = WignerdMatrix(j,β)
 			test(d,β)
 		end
@@ -228,10 +525,19 @@ end
 			d = WignerdMatrix(j,β)
 			test(d,β) 
 		end
-		@testset "PiRadians" begin
-			β = PiRadians()
-			d = WignerdMatrix(j,β)
-			test(d,β) 
+		@testset "TwoNPiRadians" begin
+		    for n in -2:2
+		   		β = TwoNPiRadians(n)
+				d = WignerdMatrix(j,β)
+				test(d,β)
+			end 	
+		end
+		@testset "TwoNPlusOnePiRadians" begin
+		    for n in -2:2
+		   		β = TwoNPlusOnePiRadians(n)
+				d = WignerdMatrix(j,β)
+				test(d,β)
+			end 	
 		end
 	end
 	@testset "d1//2_mn(β)" begin
@@ -389,19 +695,19 @@ end
 		end
 	end
 	@testset "similar" begin
-	    d = WignerdMatrix(Float32, 1, π/3)
+	    d = WignerdMatrix{Float32}(1, π/3)
 	    d′ = similar(d)
 	    @test d′ isa WignerdMatrix{Float32}
-	    @test d′.j == d.j
-	    @test d′.β == d.β
+	    @test sphericaldegree(d′) == sphericaldegree(d)
+	    @test d′.beta == d.beta
 	    @test typeof(d′.dj) == typeof(d.dj)
 	    @test size(d′.dj) == size(d.dj)
 
 	    d′ = similar(d, Float64)
 	    @test d′ isa WignerdMatrix{Float64}
-	    @test d′.j == d.j
-	    @test d′.β == d.β
-	    @test typeof(d′.dj) == typeof(d.dj)
+	    @test sphericaldegree(d′) == sphericaldegree(d)
+	    @test d′.beta == d.beta
+	    @test eltype(d′) == Float64
 	    @test size(d′.dj) == size(d.dj)
 	end
 	@testset "LinearAlgebra" begin
@@ -409,15 +715,7 @@ end
 			β = π/3
 			for j in [1/2,1,3/2,2]
 				d = WignerdMatrix(j,β)
-				v = rand(Int(2j+1))
-				m = rand(Int(2j+1),Int(2j+1))
-				@test d*v == collect(d)*v
-				@test_throws DimensionMismatch v*d
-				@test d*m == collect(d)*m
-				@test m*d == m*d
-				@test v'*d == v'*collect(d)
-				@test transpose(v)*d == transpose(v)*collect(d)
-				@test d*d == collect(d)*collect(d)
+				@test collect(d*d) ≈ collect(d)*collect(d)
 			end
 		end
 		@testset "symmetry" begin
@@ -434,47 +732,105 @@ end
 		    end
 		end
 		@testset "trace" begin
-			β = π/4
-		    d = WignerdMatrix(1/2,β)
-		    @test tr(d) ≈ 2cos(β/2)
-		    @test isapprox(tr(d),sum(d[m,m] for m=-1//2:1//2),atol=1e-14,rtol=1e-8)
+			for β in LinRange(-4π, 4π, 100)
+			    d = WignerdMatrix(1/2,β)
+			    @test isapprox(tr(d), 2cos(β/2), atol=1e-14, rtol=1e-8)
+			    @test isapprox(tr(d),sum(d[m,m] for m=-1//2:1//2),atol=1e-14,rtol=1e-8)
 
-		    d = WignerdMatrix(1/2,ZeroRadians())
-		    @test tr(d) == Float64(2)
+			    d = WignerdMatrix(1,β)
+			    @test isapprox(tr(d) , 1 + 2cos(β), atol=1e-14, rtol=1e-8)
+			    @test isapprox(tr(d),sum(d[m,m] for m=-1:1),atol=1e-14,rtol=1e-8)
+			    @test isapprox(tr(d),tr(collect(d)),atol=1e-14,rtol=1e-8)
 
-		    d = WignerdMatrix(1,β)
-		    @test tr(d) ≈ 1 + 2cos(β)
-		    @test isapprox(tr(d),sum(d[m,m] for m=-1:1),atol=1e-14,rtol=1e-8)
-		    @test isapprox(tr(d),tr(collect(d)),atol=1e-14,rtol=1e-8)
+			    d = WignerdMatrix(3/2,β)
+			    @test isapprox(tr(d) , 2(cos(β/2) + cos(3β/2)), atol=1e-14, rtol=1e-8)
+			    @test isapprox(tr(d),sum(d[m,m] for m=-3//2:3//2),atol=1e-14,rtol=1e-8)
+			    @test isapprox(tr(d),tr(collect(d)),atol=1e-14,rtol=1e-8)
 
-		    d = WignerdMatrix(1,ZeroRadians())
-		    @test tr(d) == Float64(3)
+			    d = WignerdMatrix(2,β)
+			    @test isapprox(tr(d),1 + 2cos(β) + 2cos(2β),atol=1e-14,rtol=1e-8)
+			    @test isapprox(tr(d),sum(d[m,m] for m=-2:2),atol=1e-14,rtol=1e-8)
+			    @test isapprox(tr(d), tr(collect(d)),atol=1e-14,rtol=1e-8)
+			end
 
-		    d = WignerdMatrix(3/2,β)
-		    @test tr(d) ≈ 2(cos(β/2) + cos(3β/2))
-		    @test isapprox(tr(d),sum(d[m,m] for m=-3//2:3//2),atol=1e-14,rtol=1e-8)
-		    @test isapprox(tr(d),tr(collect(d)),atol=1e-14,rtol=1e-8)
+			for n = 0:10
+			    d1 = WignerdMatrix(n/2, ZeroRadians())
+			    d2 = WignerdMatrix(n/2, TwoNPiRadians(0))
+			    d3 = WignerdMatrix(n/2, TwoNPiRadians(2))
+			    @test tr(d1) == tr(d2) == tr(d3) == Float64(n + 1)
+				
+				d1 = WignerdMatrix(n/2, π)
+				d2 = WignerdMatrix(n/2, TwoNPlusOnePiRadians(0))
+				rexp = isinteger(n/2) ? (-1)^Int(n/2) : 0
+			    @test tr(d1) == tr(d2) == rexp
 
-		    d = WignerdMatrix(3/2,ZeroRadians())
-		    @test tr(d) == Float64(4)
-
-		    d = WignerdMatrix(2,β)
-		    @test isapprox(tr(d),1 + 2cos(β) + 2cos(2β),atol=1e-14,rtol=1e-8)
-		    @test isapprox(tr(d),sum(d[m,m] for m=-2:2),atol=1e-14,rtol=1e-8)
-		    @test isapprox(tr(d), tr(collect(d)),atol=1e-14,rtol=1e-8)
-
-		    d = WignerdMatrix(2,ZeroRadians())
-		    @test tr(d) == Float64(5)
+			    d = WignerdMatrix(n/2, TwoNPiRadians(1))
+			    rexp = isinteger(n/2) ? n+1 : -(n+1)
+			    @test tr(d) == rexp
+			end
 		end
 		@testset "inv" begin
 			rotangles = -4π:π/4:4π
-			for β = rotangles, j in 0:1//2:4
+			js = 0:1//2:4
+			for β = rotangles, j in js
 				d = WignerdMatrix(j,β)
 				dinv = inv(d)
 				@test dinv isa WignerdMatrix
 				@test collect(dinv) ≈ inv(collect(d))
-				@test dinv * d ≈ I
+				@test collect(dinv * d) ≈ Diagonal(ones(size(d,1)))
 			end
+
+			for j in js
+				d = WignerdMatrix(j, ZeroRadians())
+				@test inv(d) == d
+				@test inv(d).beta === ZeroRadians()
+
+				d = WignerdMatrix(j, TwoNPlusOnePiRadians(0))
+				dinv = WignerdMatrix(j, -TwoNPlusOnePiRadians(0))
+				@test inv(d) == dinv
+				@test inv(d).beta === -TwoNPlusOnePiRadians(0)
+
+				d = WignerdMatrix(j, TwoNPiRadians(1))
+				dinv = WignerdMatrix(j, -TwoNPiRadians(1))
+				@test inv(d) == dinv
+				@test inv(d).beta === -TwoNPiRadians(1)
+
+				d = WignerdMatrix(j, TwoNPlusOnePiRadians(1))
+				dinv = WignerdMatrix(j, -TwoNPlusOnePiRadians(1))
+				@test inv(d) == dinv
+				@test inv(d).beta === -TwoNPlusOnePiRadians(1)
+			end
+		end
+		@testset "diag" begin
+			function testdiag(d)
+				j = sphericaldegree(d)
+				@test begin 
+					res = diag(d) == [d[m,m] for m=-j:j] == diag(collect(d))
+					if !res
+						@show j, d.beta
+					end
+					res
+				end
+			end
+			for j = 0:1//2:10
+		    	for β in LinRange(-4π, 4π, 100)
+			    	d = WignerdMatrix(j, β)
+			    	testdiag(d)
+			    end
+
+			    for T in [ZeroRadians, Piby2Radians]
+			    	d = WignerdMatrix(j, T())
+			    	testdiag(d)
+			    end
+
+			    d = WignerdMatrix(j, π)
+			    testdiag(d)
+
+			    for T in [TwoNPiRadians, TwoNPlusOnePiRadians], n=-3:3
+			    	d = WignerdMatrix(j, T(n))
+			    	testdiag(d)
+			    end
+		    end
 		end
 	end
 end
@@ -485,16 +841,13 @@ end
 		j = 2
 		D = WignerDMatrix(j,α,β,γ)
 
-        @test D.α == α
-        @test D.γ == γ
-        @test D.dj.β == β
+        @test D.alpha == α
+        @test D.gamma == γ
+        @test D.dj.beta == β
         @test WignerDMatrices.eulerangles(D) == (α,β,γ)
         @test D.dj isa WignerdMatrix
         @test D.dj == WignerdMatrix(j,β)
         @test WignerDMatrices.sphericaldegree(D) == j
-
-        @test collect(D) == D
-        @test D == collect(D)
 
         D2 = WignerDMatrix(j,α,β,γ)
         @test D == D2
@@ -511,46 +864,38 @@ end
         	β = π/3
 			α,γ = π/6, π/2
 			j = 2
-            D = WignerDMatrix(j,PiRadians(),β,γ)
+            D = WignerDMatrix(j,TwoNPlusOnePiRadians(0),β,γ)
             @test D[1,1] == -D.dj[1,1] * cis(-γ)
-            D = WignerDMatrix(j,PiRadians(),β,ZeroRadians())
+            D = WignerDMatrix(j,TwoNPlusOnePiRadians(0),β,ZeroRadians())
             @test D[1,1] == -D.dj[1,1]
-            D = WignerDMatrix(j,α,β,PiRadians())
+            D = WignerDMatrix(j,α,β,TwoNPlusOnePiRadians(0))
             @test D[1,1] == -D.dj[1,1] * cis(-α)
         end
-    end
-    @testset "update angles" begin
-    	β = π/3
-		α,γ = π/6, π/2
-		j = 2
-		D = WignerDMatrix(j,α,β,γ)
-		β_new = π/2
-        WignerdMatrix!(D,β_new)
-        @test D.dj == WignerdMatrix(j,β_new)
     end
     @testset "indexing" begin
     	β = π/3
 		α,γ = π/6, π/2
 		j = 2
 		D = WignerDMatrix(j,α,β,γ)
-        @test D[1,1] == D.dj[1,1]*cis(-(D.α + D.γ))
+        @test D[1,1] ≈ D.dj[1,1]*cis(-(D.alpha + D.gamma))
 
-		D[1,1] = 4*cis(-(D.α + D.γ))
-		@test D.dj[1,1] ≈ 4
-		@test D[1,1] ≈ 4*cis(-(D.α + D.γ))
+        for n in axes(D,2), m in axes(D,1)
+        	Dmn = WignerDMatrices.wignerDmatrixelement(j, m, n, (α,β,γ))
+        	@test isapprox(D[m,n], Dmn, atol=1e-13, rtol=1e-8)
+        end
     end
     @testset "similar" begin
-	    D = WignerDMatrix(ComplexF64, 1, 0, π/3, π/3)
+	    D = WignerDMatrix{ComplexF64}(1, 0, π/3, π/3)
 	    D′ = similar(D)
 	    @test D′ isa WignerDMatrix{ComplexF64}
-	    @test D′.dj.j == D.dj.j
-	    @test D′.dj.β == D.dj.β
+	    @test sphericaldegree(D′.dj) == sphericaldegree(D.dj)
+	    @test D′.dj.beta == D.dj.beta
 	    @test typeof(D′.dj) == typeof(D.dj)
 	    @test size(D′.dj) == size(D.dj)
 
 	    D′ = similar(D, ComplexF32)
 	    @test D′ isa WignerDMatrix{ComplexF32}
-	    @test D′.dj.j == D.dj.j
+	    @test sphericaldegree(D′.dj) == sphericaldegree(D.dj)
 	    @test typeof(D′.dj) == typeof(D.dj)
 	    @test size(D′.dj) == size(D.dj)
 	end
@@ -561,17 +906,9 @@ end
 			α,γ = π/6, π/2
 			for j in [1/2,1,3/2,2]
 				D = WignerDMatrix(j,α,β,γ)
-				v = rand(Int(2j+1))
-				m = rand(Int(2j+1),Int(2j+1))
-				@test D*v == collect(D)*v
-				@test_throws DimensionMismatch v*D
-				@test D*m == collect(D)*m
-				@test m*D == m*D
-				@test v'*D == v'*collect(D)
-				@test transpose(v)*D == transpose(v)*collect(D)
-				@test D*D == collect(D)*collect(D)
-				@test D*D.dj == collect(D)*collect(D.dj)
-				@test D.dj*D == collect(D.dj)*collect(D)
+				@test collect(D*D) == collect(D)*collect(D)
+				@test collect(D*D.dj) ≈ collect(D)*collect(D.dj)
+				@test collect(D.dj*D) ≈ collect(D.dj)*collect(D)
 			end
 		end
 		@testset "symmetry" begin
@@ -590,11 +927,33 @@ end
 		    end
 		end
 		@testset "trace" begin
-			for j in 0:1//2:2, α in rotangles, 
+			for j in 0:1//2:10, α in rotangles, 
 				β in rotangles, γ in rotangles
 			    D = WignerDMatrix(j,α,β,γ)
-			    @test isapprox(tr(D),sum(D[m,m] for m=-j:j),atol=1e-14,rtol=1e-8)
-			    @test isapprox(tr(D),tr(collect(D)),atol=1e-14,rtol=1e-8)
+			    @test begin 
+			    	res = isapprox(tr(D),sum(D[m,m] for m=-j:j),atol=1e-12,rtol=1e-8)
+			    	if !res
+			    		@show j, α, β, γ
+			    	end
+			    	res
+			    end
+			    @test isapprox(tr(D),tr(collect(D)),atol=1e-12,rtol=1e-8)
+			end
+
+			for j in 0:1//2:10, α in rotangles, γ in rotangles
+				D1 = WignerDMatrix(j,α,ZeroRadians(),γ)
+				D2 = WignerDMatrix(j,α,0,γ)
+				D3 = WignerDMatrix(j,α,TwoNPiRadians(0),γ)
+			    @test isapprox(tr(D1),sum(D1[m,m] for m=-j:j),atol=1e-12,rtol=1e-8)
+			    @test isapprox(tr(D1),tr(collect(D1)),atol=1e-12,rtol=1e-8)
+			    @test tr(D1) == tr(D2) == tr(D3)
+
+			    D1 = WignerDMatrix(j,α,TwoNPlusOnePiRadians(0),γ)
+			    D2 = WignerDMatrix(j,α,π,γ)
+			    D3 = WignerDMatrix(j,α,TwoNPlusOnePiRadians(0),γ)
+			    @test isapprox(tr(D1),sum(D1[m,m] for m=-j:j),atol=1e-12,rtol=1e-8)
+			    @test isapprox(tr(D1),tr(collect(D1)),atol=1e-12,rtol=1e-8)
+			    @test tr(D1) == tr(D2) == tr(D3)
 			end
 		end
 		@testset "inv" begin
@@ -605,26 +964,102 @@ end
 				Dinv = inv(D)
 				@test Dinv isa WignerDMatrix
 				@test collect(Dinv) ≈ inv(collect(D))
-				@test Dinv * D ≈ I
 			end
 		end
+		@testset "diag" begin
+		    function testdiag(d)
+				j = sphericaldegree(d)
+				@test begin 
+					res = diag(d) == [d[m,m] for m=-j:j] == diag(collect(d))
+					if !res
+						@show j, d.beta
+					end
+					res
+				end
+			end
+			for j = 0:1//2:10
+		    	for α in rotangles, γ in rotangles
+
+		    		for β in rotangles
+				    	D = WignerDMatrix(j, α, β, γ)
+				    	testdiag(D)
+				    end
+				    for T in [ZeroRadians, Piby2Radians]
+				    	D = WignerDMatrix(j, α, T(), γ)
+				    	testdiag(D)
+				    end
+
+				    D = WignerDMatrix(j, α, π, γ)
+				    testdiag(D)
+
+				    for T in [TwoNPiRadians, TwoNPlusOnePiRadians], n=-3:3
+				    	D = WignerDMatrix(j, α, T(n), γ)
+				    	testdiag(D)
+				    end
+			    end
+		    end
+		end
 	end
+end
+@testset "subarray" begin
+	j = half(1); α, β, γ = 2π*rand(), 2π*rand(), 2π*rand()
+
+	function testviewindexing(d)
+		dv = @view d[0.5,0.5]
+        @test dv[] == d[0.5,0.5]
+
+        dv = @view d[:,0.5]
+        for i in axes(d,1)
+			@test dv[i] == d[i,0.5]
+		end
+
+		dv = @view d[-0.5:0.5, 0.5]
+        for (ind,i) in enumerate(axes(d,1))
+			@test dv[ind] == d[i,0.5]
+		end
+
+		dv = @view d[:,:]
+		for i in eachindex(d)
+			@test dv[i] == d[i]
+		end
+	end
+    @testset "WignerdMatrix" begin
+        d = WignerdMatrix(j, β)
+        testviewindexing(d)
+    end
+    @testset "WignerDMatrix" begin
+        d = WignerDMatrix(j, α, β, γ)
+        testviewindexing(d)
+    end
 end
 @testset "show" begin
     io = IOBuffer()
 
-    d = WignerdMatrix(1, π/2)
-    summary(io,d)
-    strexp = "Wigner d-matrix with j = $(d.j) and β = $(d.β)"
-    @test String(take!(io)) == strexp
+    function testshow(io, d)
+    	summary(io,d)
+	    show(io,MIME"text/plain"(), d)
+	    show(io, d)
+    end
 
-    D = WignerDMatrix(0, d, 0)
-    summary(io,D)
-    α,β,γ = WignerDMatrices.eulerangles(D)
-    strexp = "Wigner D-matrix with j = $(d.j)"*
-    ", with α = $α, β = $β and γ = $γ"
-    @test String(take!(io)) == strexp
+    for β in [rand(), ZeroRadians(), Piby2Radians(), 
+    	TwoNPiRadians(1), TwoNPlusOnePiRadians(1)]
+	    
+	    d = WignerdMatrix(1, β)
+	    testshow(io, d)
 
-    show(io,MIME"text/plain"(), d)
-    show(io, d)
+	    D = WignerDMatrix(0, d, 0)
+    	testshow(io, D)
+
+	    d = WignerdMatrix(0.5, β)
+	    testshow(io, d)
+
+	    D = WignerDMatrix(0, d, 0)
+    	testshow(io, D)
+	end    
+
+    D = WignerDMatrix(1/2, 0, 0, 0)
+	testshow(io, D)    
+
+    Dv = @view D[:,:]
+    testshow(io, Dv)
 end
