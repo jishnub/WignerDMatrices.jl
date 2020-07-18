@@ -6,7 +6,7 @@ using Test
 import WignerDMatrices: cis_special, Piby2Radians, ZeroRadians,
 TwoNPiRadians, TwoNPlusOnePiRadians
 import WignerDMatrices: WignerdMatrixContainer, flatind, filledelements, 
-flatind_phase, sphericaldegree
+flatind_phase, sphericaldegree, SpinMatrix
 
 @test isempty(Test.detect_ambiguities(Base, Core, WignerDMatrices))
 
@@ -491,6 +491,8 @@ end
 			for i in eachindex(d.dj)
 				@test d[i] == d.dj[i]
 			end
+
+			@test SpinMatrix(d) == SpinMatrix(collect(d))
 		end
 		@testset "half-integer j" begin
 			j = 3//2
@@ -507,6 +509,8 @@ end
 			for i in eachindex(d.dj)
 				@test d[i] == d.dj[i]
 			end
+
+			@test SpinMatrix(d) == SpinMatrix(collect(d))
 		end
 	end
 	function checkdjvalues(test,j,n)
@@ -640,6 +644,16 @@ end
 	    n = 100
 		j = 2
 		checkdjvalues(test,j,n)
+	end
+	@testset "linear indexing" begin
+	    d1by2 = WignerdMatrix(0.5, rand())
+	    d1 = WignerdMatrix(1, rand())
+
+	    for d in [d1by2, d1]
+		    for (ind,I) in enumerate(eachindex(d))
+		    	@test d[ind] == d[I]
+		    end
+		end
 	end
 	@testset "shift angles" begin
 		@testset "β + 4π*n" begin
@@ -849,6 +863,8 @@ end
         @test D.dj == WignerdMatrix(j,β)
         @test WignerDMatrices.sphericaldegree(D) == j
 
+        @test SpinMatrix(D) == SpinMatrix(collect(D))
+
         D2 = WignerDMatrix(j,α,β,γ)
         @test D == D2
 
@@ -879,9 +895,14 @@ end
 		D = WignerDMatrix(j,α,β,γ)
         @test D[1,1] ≈ D.dj[1,1]*cis(-(D.alpha + D.gamma))
 
+        # Cartesian indexing
         for n in axes(D,2), m in axes(D,1)
         	Dmn = WignerDMatrices.wignerDmatrixelement(j, m, n, (α,β,γ))
         	@test isapprox(D[m,n], Dmn, atol=1e-13, rtol=1e-8)
+        end
+
+        for (i,I) in enumerate(eachindex(D))
+        	@test D[i] == D[I]
         end
     end
     @testset "similar" begin
@@ -1030,6 +1051,38 @@ end
     @testset "WignerDMatrix" begin
         d = WignerDMatrix(j, α, β, γ)
         testviewindexing(d)
+    end
+end
+@testset "broadcasting" begin
+    @testset "wignerdmatrix" begin
+        d1by2 = WignerdMatrix(1/2, rand())
+        d1 = WignerdMatrix(1, rand())
+
+        for d in [d1by2, d1]
+	        d2 = d .+ d
+	        for I in eachindex(d)
+	        	@test d2[I] == 2d[I]
+	        end
+	        d2 = d .+ 0
+	        for I in eachindex(d)
+	        	@test d2[I] == d[I]
+	        end
+	    end
+    end
+    @testset "wignerDmatrix" begin
+        D1by2 = WignerDMatrix(1/2, rand(3)...)
+        D1 = WignerDMatrix(1, rand(3)...)
+
+        for d in [D1by2, D1]
+	        d2 = d .+ d
+	        for I in eachindex(d)
+	        	@test d2[I] == 2d[I]
+	        end
+	        d2 = d .+ 0
+	        for I in eachindex(d)
+	        	@test d2[I] == d[I]
+	        end
+	    end
     end
 end
 @testset "show" begin

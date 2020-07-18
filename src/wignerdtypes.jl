@@ -102,20 +102,6 @@ end
 
 abstract type AbstractWignerMatrix{T} <: AbstractHalfIntegerMatrix{T} end
 
-indicescompatible(j::HalfInt, I::Tuple{}) = true
-function indicescompatible(j::HalfInt, I::Tuple{Int,Vararg{Any}})
-	isinteger(j) && indicescompatible(j, Base.tail(I))
-end
-function indicescompatible(j::HalfInt, I::Tuple{Real,Vararg{Any}})
-	isinteger(j + first(I)) && indicescompatible(j, Base.tail(I))
-end
-
-for DT in [:Integer, :Real]
-	@eval function Base.isassigned(A::AbstractWignerMatrix, I::$DT...)
-	    checkbounds(Bool, A, I...) && isassigned(parent(A), I...)
-	end
-end
-
 Base.size(w::AbstractWignerMatrix) = size(parent(w))
 Base.axes(w::AbstractWignerMatrix) = axes(parent(w))
 Base.axes(w::AbstractWignerMatrix, d) = axes(parent(w), d)
@@ -148,41 +134,22 @@ end
 
 Base.parent(d::WignerdMatrix) = d.dj
 Base.collect(d::WignerdMatrix) = collect(parent(d))
-function Base.collect(d::WignerdMatrix{T,<:Union{SpecialAngle, Irrational{:π}}}) where {T}
-	A = Array{T}(undef, size(d))
-	@inbounds for (Ai, di) in zip(eachindex(A), eachindex(d))
-		A[Ai] = d[di]
-	end
-	A
+
+@propagate_inbounds function Base.getindex(d::WignerdMatrix{T}, m::Real, n::Real) where {T}
+	parent(d)[m,n]
 end
 
-for DT in [:Integer, :Real]
-	@eval function Base.isassigned(A::WignerdMatrix{<:Any, <:Union{ScaledPi, Irrational{:π}}}, I::$DT...)
-	    checkbounds(Bool, A, I...) && indicescompatible(sphericaldegree(A), I)
-	end
-end
-
-# Linear indexing
-function Base.isassigned(A::WignerdMatrix{<:Any, <:Union{ScaledPi, Irrational{:π}}}, i::Real)
-    checkbounds(Bool, A, i)
-end
-
-@propagate_inbounds function Base.getindex(d::WignerdMatrix{T}, i::Real, I::Real...) where {T}
-	convert(T, parent(d)[i, I...])
-end
-
-@propagate_inbounds function Base.getindex(d::WignerdMatrix{T, <:Union{ScaledPi,Irrational{:π}}}, m::Real, n::Real, I::Real...) where {T}
-	@boundscheck checkbounds(d, m, n, I...)
-	dmn = wignerdmatrixelement(sphericaldegree(d), m, n, d.beta)
-	convert(T, dmn)
+@propagate_inbounds function Base.getindex(d::WignerdMatrix{T, <:Union{ScaledPi,Irrational{:π}}}, m::Real, n::Real) where {T}
+	@boundscheck checkbounds(d, m, n)
+	wignerdmatrixelement(T, sphericaldegree(d), m, n, d.beta)
 end
 
 #= Linear indexing has to be done in a roundabout way through Cartesian indexing
 to avoid undefined references.
 =#
-@propagate_inbounds function Base.getindex(d::WignerdMatrix{<:Any, <:Union{ScaledPi,Irrational{:π}}}, i::Real)
+@inline function Base.getindex(d::WignerdMatrix, i::Int)
 	@boundscheck checkbounds(d, i)
-	mn = Tuple(eachindex(d)[HalfInt(i)])
+	mn = Tuple(@inbounds eachindex(d)[i])
 	@inbounds d[mn...]
 end
 
@@ -243,17 +210,18 @@ WignerDphase(m, α::Real) = cis(-m * α)
 WignerDphase(m, α::SpecialAngle) = cis_special(-m, α)
 WignerDphase(m, α::ZeroRadians) = 1 # return an integer to avoid complex multiplication
 
-@propagate_inbounds function Base.getindex(D::WignerDMatrix{T}, m::Real, n::Real, I::Real...) where {T}
-	@boundscheck checkbounds(D, m, n, I...)
-	val = D.dj[m,n] * WignerDphase(m, D.alpha) * WignerDphase(n, D.gamma)
+@inline function Base.getindex(D::WignerDMatrix{T}, m::Real, n::Real) where {T}
+	@boundscheck checkbounds(D, m, n)
+	dmn = @inbounds D.dj[m,n]
+	val = dmn * WignerDphase(m, D.alpha) * WignerDphase(n, D.gamma)
 	convert(T, val)
 end
 
 # Linear indexing forces Cartesian indexing
-@propagate_inbounds function Base.getindex(D::WignerDMatrix, i::Real)
+@inline function Base.getindex(D::WignerDMatrix, i::Int)
 	@boundscheck checkbounds(D, i)
-	mn = Tuple(eachindex(D)[HalfInt(i)])
-	D[mn...]
+	mn = Tuple(@inbounds eachindex(D)[i])
+	@inbounds D[mn...]
 end
 
 function Base.:(==)(d1::WignerDMatrix, d2::WignerDMatrix)
@@ -279,6 +247,14 @@ end
 function Base.similar(D::WignerDMatrix, ::Type{T}) where {T}
 	d = similar(D.dj)
 	WignerDMatrix{T}(D.alpha, d, D.gamma)
+end
+
+HalfIntegerArrays.SpinMatrix(d::AbstractWignerMatrix) = SpinMatrix(collect(d))
+
+Base.dataids(d::WignerdMatrixContainer) = Base.dataids(d.v)
+Base.dataids(d::AbstractWignerMatrix) = Base.dataids(parent(d))
+function Broadcast.broadcast_unalias(dest::AbstractWignerMatrix, src::AbstractWignerMatrix)
+	parent(dest) === parent(src) ? src : Broadcast.unalias(dest, src)
 end
 
 # Display
