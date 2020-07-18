@@ -4,6 +4,8 @@
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/jishnub/WignerDMatrices.jl?svg=true)](https://ci.appveyor.com/project/jishnub/WignerDMatrices-jl)
 [![Codecov](https://codecov.io/gh/jishnub/WignerDMatrices.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jishnub/WignerDMatrices.jl)
 [![Coveralls](https://coveralls.io/repos/github/jishnub/WignerDMatrices.jl/badge.svg?branch=master)](https://coveralls.io/github/jishnub/WignerDMatrices.jl?branch=master)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jishnub.github.io/WignerDMatrices.jl/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jishnub.github.io/WignerDMatrices.jl/dev)
 
 Wigner D and d matrices following [Feng et al. (2015)](https://arxiv.org/abs/1507.04535) and the phase convention used by Varshalovich [1988]. The D matrix is defined as 
 

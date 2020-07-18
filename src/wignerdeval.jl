@@ -136,9 +136,9 @@ true
 wignerdmatrixelement(j::Real, m, n, β::Real, v = eigenvecsJy!(j)) = wignerdmatrixelement(HalfInt(j), m, n, β, v)
 
 """
-	wignerDmatrixelement(j::Real, m, n, β::Real, [v = WignerDMatrices.eigenvecsJy!(j)])
+	wignerDmatrixelement(j::Real, m, n, (α, β, γ)::NTuple{3,Real}, [v = WignerDMatrices.eigenvecsJy!(j)])
 
-Compute the element ``D^j_{m,n}(β)`` of the Wigner D-matrix in the z-y-z convention.
+Compute the element ``D^j_{m,n}(α, β, γ)`` of the Wigner D-matrix in the z-y-z convention.
 Optionally the matrix `v` that contains the transposed eigenvectors of the angular momentum 
 operator `Jy` corresponding to `j` may be provided.
 
